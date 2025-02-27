@@ -1,0 +1,2512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monad Chain - Realtime Transaction Visualizer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Orbitron', monospace;
+        }
+        
+        body {
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+        }
+        
+        #app {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+            pointer-events: all;
+            border-bottom: 1px solid rgba(170, 80, 255, 0.4);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            margin-right: 20px;
+        }
+        
+        .logo-img {
+            width: 40px;
+            height: 40px;
+            margin-right: 15px;
+            background: rgba(170, 80, 255, 0.2);
+            border: 1px solid rgba(170, 80, 255, 0.5);
+            border-radius: 50%;
+        }
+        
+        .logo-text {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(to right, #a050ff, #6a20e0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .stat-box {
+            background: rgba(30, 10, 60, 0.8);
+            border: 1px solid rgba(170, 80, 255, 0.4);
+            border-radius: 2px;
+            padding: 8px 16px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, #a050ff, #6a20e0);
+            animation: scan 2s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #a050ff;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(170, 80, 255, 0.7);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .control-btn {
+            background: rgba(30, 10, 60, 0.7);
+            border: 1px solid rgba(170, 80, 255, 0.4);
+            border-radius: 2px;
+            padding: 8px 15px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+            pointer-events: all;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .control-btn::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: #a050ff;
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            background: rgba(60, 20, 120, 0.7);
+            border-color: rgba(170, 80, 255, 0.7);
+        }
+        
+        .control-btn:hover::after {
+            transform: scaleX(1);
+        }
+        
+        .control-help {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(20, 5, 40, 0.85);
+            border: 1px solid rgba(170, 80, 255, 0.4);
+            border-radius: 2px;
+            padding: 15px;
+            font-size: 12px;
+            pointer-events: all;
+            transform: translateX(350px);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 0 20px rgba(170, 80, 255, 0.2);
+        }
+        
+        .control-help.show {
+            transform: translateX(0);
+        }
+        
+        .control-help-title {
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #a050ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(170, 80, 255, 0.4);
+            padding-bottom: 8px;
+        }
+        
+        .control-help-item {
+            display: flex;
+            margin-bottom: 12px;
+            font-size: 11px;
+            align-items: center;
+        }
+        
+        .control-help-key {
+            background: rgba(170, 80, 255, 0.15);
+            border: 1px solid rgba(170, 80, 255, 0.3);
+            border-radius: 2px;
+            padding: 4px 8px;
+            margin-right: 12px;
+            font-family: 'Orbitron', monospace;
+            color: #a050ff;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        .transaction-details {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 380px;
+            background: rgba(20, 5, 40, 0.85);
+            border: 1px solid rgba(170, 80, 255, 0.4);
+            border-radius: 2px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            transform: translateY(150%);
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: all;
+            box-shadow: 0 0 30px rgba(170, 80, 255, 0.15);
+        }
+        
+        .transaction-details.show {
+            transform: translateY(0);
+        }
+        
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(170, 80, 255, 0.4);
+            padding-bottom: 10px;
+        }
+        
+        .detail-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #a050ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .detail-close {
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            color: #a050ff;
+            font-size: 18px;
+            padding: 5px;
+        }
+        
+        .detail-close:hover {
+            opacity: 1;
+            text-shadow: 0 0 10px rgba(170, 80, 255, 0.7);
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 13px;
+            position: relative;
+        }
+        
+        .detail-row::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: rgba(170, 80, 255, 0.2);
+        }
+        
+        .detail-label {
+            color: #a050ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 11px;
+        }
+        
+        .detail-value {
+            max-width: 210px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: right;
+            font-weight: 500;
+        }
+        
+        .hash-value {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            background: rgba(70, 20, 100, 0.3);
+            padding: 10px;
+            border: 1px solid rgba(170, 80, 255, 0.3);
+            border-radius: 2px;
+            margin-top: 5px;
+            letter-spacing: 1px;
+        }
+        
+        .view-buttons {
+            position: absolute;
+            left: 20px;
+            bottom: 20px;
+            display: flex;
+            gap: 2px;
+            pointer-events: all;
+        }
+        
+        .view-btn {
+            background: rgba(30, 10, 60, 0.8);
+            border: 1px solid rgba(170, 80, 255, 0.4);
+            border-radius: 0;
+            padding: 10px 15px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .view-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: transparent;
+            transition: background 0.3s ease;
+        }
+        
+        .view-btn.active {
+            background: rgba(90, 40, 160, 0.5);
+            border-color: rgba(170, 80, 255, 0.7);
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(170, 80, 255, 0.7);
+        }
+        
+        .view-btn.active::before {
+            background: #a050ff;
+        }
+        
+        .view-btn:hover {
+            background: rgba(60, 20, 120, 0.7);
+            border-color: rgba(170, 80, 255, 0.6);
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(20, 5, 40, 0.9);
+            border: 1px solid rgba(170, 80, 255, 0.4);
+            border-radius: 2px;
+            padding: 8px 12px;
+            font-size: 11px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 20px rgba(170, 80, 255, 0.3);
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 2, 20, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(170, 80, 255, 0.2);
+            border-radius: 50%;
+            border-top-color: #a050ff;
+            animation: spin 1s ease-in-out infinite;
+            box-shadow: 0 0 30px rgba(170, 80, 255, 0.4);
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .notification {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(20, 5, 40, 0.9);
+            border-left: 4px solid #a050ff;
+            border-radius: 0;
+            padding: 15px;
+            width: 300px;
+            transform: translateX(350px);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: all;
+            z-index: 100;
+            box-shadow: 0 0 20px rgba(170, 80, 255, 0.2);
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #a050ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 14px;
+        }
+        
+        .notification-message {
+            font-size: 12px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+        
+        .status-indicator {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            background: rgba(20, 5, 40, 0.85);
+            border: 1px solid rgba(170, 80, 255, 0.4);
+            border-radius: 2px;
+            padding: 10px 15px;
+            font-size: 12px;
+            pointer-events: all;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            background-color: #a050ff;
+            box-shadow: 0 0 10px rgba(170, 80, 255, 0.7);
+        }
+        
+        .status-dot.disconnected {
+            background-color: #ff4d77;
+            box-shadow: 0 0 10px rgba(255, 77, 119, 0.7);
+        }
+        
+        .status-dot.connecting {
+            background-color: #a050ff;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.5; box-shadow: 0 0 5px rgba(170, 80, 255, 0.4); }
+            50% { opacity: 1; box-shadow: 0 0 15px rgba(170, 80, 255, 0.8); }
+            100% { opacity: 0.5; box-shadow: 0 0 5px rgba(170, 80, 255, 0.4); }
+        }
+        
+        /* Visualization Legend */
+        .legend {
+            position: absolute;
+            top: 130px;
+            left: 20px;
+            background: rgba(20, 5, 40, 0.85);
+            border: 1px solid rgba(170, 80, 255, 0.4);
+            border-radius: 2px;
+            padding: 15px;
+            pointer-events: all;
+            box-shadow: 0 0 20px rgba(170, 80, 255, 0.2);
+        }
+        
+        .legend-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #a050ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(170, 80, 255, 0.4);
+            padding-bottom: 8px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            margin-right: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="canvas-container"></div>
+        
+        <div class="ui-layer">
+            <div class="header">
+                <div class="logo">
+                    <div class="logo-img"></div>
+                    <div class="logo-text">Monad Chain Explorer</div>
+                </div>
+                <div class="stats">
+                    <div class="stat-box">
+                        <div class="stat-label">Latest Block</div>
+                        <div class="stat-value" id="block-value">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Total Txns</div>
+                        <div class="stat-value" id="txn-value">0</div>
+                    </div>
+                </div>
+                <div class="controls">
+                    <button class="control-btn" id="pause-btn">Pause</button>
+                    <button class="control-btn" id="help-btn">Controls</button>
+                </div>
+            </div>
+            
+            <div class="status-indicator" id="connection-status">
+                <div class="status-dot" id="status-dot"></div>
+                <div id="status-text">Connecting to Monad...</div>
+            </div>
+            
+            <div class="control-help" id="control-help">
+                <div class="control-help-title">Camera Controls</div>
+                <div class="control-help-item">
+                    <div class="control-help-key">Left Click + Drag</div>
+                    <div>Rotate camera</div>
+                </div>
+                <div class="control-help-item">
+                    <div class="control-help-key">Right Click + Drag</div>
+                    <div>Pan camera</div>
+                </div>
+                <div class="control-help-item">
+                    <div class="control-help-key">Scroll</div>
+                    <div>Zoom in/out</div>
+                </div>
+                <div class="control-help-item">
+                    <div class="control-help-key">Double Click</div>
+                    <div>Select transaction</div>
+                </div>
+            </div>
+            
+            <div class="transaction-details" id="tx-details">
+                <div class="detail-header">
+                    <div class="detail-title">Transaction Details</div>
+                    <div class="detail-close" id="detail-close">✕</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Block</div>
+                    <div class="detail-value" id="detail-block">-</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Time</div>
+                    <div class="detail-value" id="detail-time">-</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">From</div>
+                    <div class="detail-value" id="detail-from">-</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">To</div>
+                    <div class="detail-value" id="detail-to">-</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Value</div>
+                    <div class="detail-value" id="detail-value">-</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Gas</div>
+                    <div class="detail-value" id="detail-gas">-</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Hash</div>
+                </div>
+                <div class="hash-value" id="detail-hash">-</div>
+            </div>
+            
+            <div class="view-buttons">
+                <button class="view-btn active" id="view-stream">Stream View</button>
+            </div>
+            
+            <div class="legend">
+                <div class="legend-title">Transaction Types</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #8a2be2;"></div>
+                    <div>Standard Transaction</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4dff77;"></div>
+                    <div>Contract Interaction</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4d77ff;"></div>
+                    <div>Token Transfer</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f9cb28;"></div>
+                    <div>NFT Transaction</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="notification" id="notification">
+            <div class="notification-title">Contract Deployment Detected!</div>
+            <div class="notification-message">A new smart contract was deployed on the chain.</div>
+        </div>
+        
+        <div class="tooltip" id="tooltip"></div>
+        
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="loader"></div>
+            <div>Loading Blockchain Visualizer...</div>
+        </div>
+    </div>
+
+    <!-- Import libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
+    
+    <script>
+        // Main application
+        class MonadExplorer {
+            constructor() {
+                // Configuration
+                this.config = {
+                    rpcEndpoint: 'https://monad-testnet.g.alchemy.com/v2/PTox95CrPhqgSRASB8T4ogM_2K-4_Sf5',
+                    pollingInterval: 3000, // ms - more reasonable polling interval
+                    retryInterval: 5000, // ms - retry on connection failure
+                    maxVisibleTransactions: 1000,
+                    particleLifetime: 10000, // ms
+                    colors: {
+                        standard: 0x8a2be2, // Purple
+                        contract: 0x4dff77,
+                        token: 0x4d77ff,
+                        nft: 0xf9cb28
+                    }
+                };
+                
+                // Application state
+                this.state = {
+                    transactions: [],
+                    particles: [],
+                    latestBlockNumber: 0,
+                    transactionCount: 0,
+                    isPaused: false,
+                    selectedTransaction: null,
+                    knownTransactionHashes: new Set(),
+                    connectionStatus: 'connecting', // 'connected', 'connecting', 'disconnected'
+                    lastProcessedBlock: 0,
+                    failedAttempts: 0
+                };
+                
+                // Initialize Web3.js
+                this.initWeb3();
+                
+                // Plugin system
+                this.plugins = [];
+                
+                // Initialize Three.js scene
+                this.initThree();
+                
+                // Initialize UI
+                this.initUI();
+                
+                // Load plugins
+                this.loadPlugins();
+                
+                // Start blockchain polling with exponential backoff
+                this.startDataPolling();
+                
+                // Hide loading overlay after initialization
+                setTimeout(() => {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                }, 2000);
+            }
+            
+            // Initialize Web3.js
+            initWeb3() {
+                try {
+                    // Create Web3 instance with the Monad testnet endpoint
+                    this.web3 = new Web3(this.config.rpcEndpoint);
+                    this.updateConnectionStatus('connecting');
+                    
+                    // Test connection
+                    this.web3.eth.getBlockNumber()
+                        .then(blockNumber => {
+                            console.log('Connected to Monad Chain. Latest block:', blockNumber);
+                            this.updateConnectionStatus('connected');
+                            this.state.latestBlockNumber = blockNumber;
+                            document.getElementById('block-value').textContent = blockNumber.toLocaleString();
+                        })
+                        .catch(error => {
+                            console.error('Failed to connect to Monad Chain:', error);
+                            this.updateConnectionStatus('disconnected');
+                        });
+                } catch (error) {
+                    console.error('Error initializing Web3:', error);
+                    this.updateConnectionStatus('disconnected');
+                }
+            }
+            
+            // Update connection status UI
+            updateConnectionStatus(status) {
+                this.state.connectionStatus = status;
+                const dot = document.getElementById('status-dot');
+                const text = document.getElementById('status-text');
+                
+                dot.className = 'status-dot';
+                
+                switch (status) {
+                    case 'connected':
+                        dot.classList.add('connected');
+                        text.textContent = 'Connected to Monad Chain';
+                        break;
+                    case 'connecting':
+                        dot.classList.add('connecting');
+                        text.textContent = 'Connecting to Monad Chain...';
+                        break;
+                    case 'disconnected':
+                        dot.classList.add('disconnected');
+                        text.textContent = 'Disconnected from Monad Chain';
+                        break;
+                }
+            }
+            
+            // Initialize Three.js scene
+            initThree() {
+                // Create scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x050510); // Very dark blue background
+                
+                // Add fog for depth
+                this.scene.fog = new THREE.FogExp2(0x050510, 0.0005);
+                
+                // Create camera
+                this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 5000);
+                this.camera.position.z = 400;  // Closer to the action to better see the flows
+                
+                // Create renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.2;
+                document.getElementById('canvas-container').appendChild(this.renderer.domElement);
+                
+                // Setup post-processing
+                this.initPostProcessing();
+                
+                // Add camera controls
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.15;
+                this.controls.enableZoom = true;
+                this.controls.autoRotate = false;
+                this.controls.autoRotateSpeed = 0.5;
+                this.controls.minDistance = 100;
+                this.controls.maxDistance = 2000;
+                
+                // Create background starfield
+                this.createStarfield();
+                
+                // Add ambient light
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+                this.scene.add(ambientLight);
+                
+                // Add directional light
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(1, 1, 1);
+                this.scene.add(directionalLight);
+                
+                // Add point lights
+                const pointLight1 = new THREE.PointLight(0x8a2be2, 1, 1000);
+                pointLight1.position.set(200, 200, 200);
+                this.scene.add(pointLight1);
+                
+                const pointLight2 = new THREE.PointLight(0x4d77ff, 1, 1000);
+                pointLight2.position.set(-200, -200, 200);
+                this.scene.add(pointLight2);
+                
+                // Create particle system
+                this.particleSystem = new THREE.Group();
+                this.scene.add(this.particleSystem);
+                
+                // No block system in stream view
+                
+                // Create a grid helper
+                const gridHelper = new THREE.GridHelper(2000, 20, 0x555555, 0x222222);
+                gridHelper.position.y = -300;
+                this.scene.add(gridHelper);
+                
+                // Initialize stream view (only view)
+                this.initStreamView();
+                
+                // Make stream view active
+                this.streamView.visible = true;
+                
+                // Setup camera
+                setTimeout(() => this.setupCamera(), 500);
+                
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    this.composer.setSize(window.innerWidth, window.innerHeight);
+                });
+                
+                // Start animation loop
+                this.animate();
+            }
+            
+            // Initialize post-processing effects
+            initPostProcessing() {
+                // Create composer
+                this.composer = new THREE.EffectComposer(this.renderer);
+                
+                // Add render pass
+                const renderPass = new THREE.RenderPass(this.scene, this.camera);
+                this.composer.addPass(renderPass);
+                
+                // Add bloom pass
+                const bloomPass = new THREE.UnrealBloomPass(
+                    new THREE.Vector2(window.innerWidth, window.innerHeight),
+                    0.8,    // strength
+                    0.3,    // radius
+                    0.7     // threshold
+                );
+                this.composer.addPass(bloomPass);
+            }
+            
+            // Create starfield background
+            createStarfield() {
+                const starsGeometry = new THREE.BufferGeometry();
+                const starCount = 10000;
+                
+                const positions = new Float32Array(starCount * 3);
+                const sizes = new Float32Array(starCount);
+                const colors = new Float32Array(starCount * 3);
+                
+                const color = new THREE.Color();
+                
+                for (let i = 0; i < starCount; i++) {
+                    // Position
+                    const i3 = i * 3;
+                    positions[i3] = (Math.random() - 0.5) * 4000;
+                    positions[i3 + 1] = (Math.random() - 0.5) * 4000;
+                    positions[i3 + 2] = (Math.random() - 0.5) * 4000;
+                    
+                    // Size
+                    sizes[i] = Math.random() * 3;
+                    
+                    // Color - based on distance from center for a color gradient effect
+                    const distance = Math.sqrt(
+                        positions[i3] * positions[i3] + 
+                        positions[i3 + 1] * positions[i3 + 1] + 
+                        positions[i3 + 2] * positions[i3 + 2]
+                    );
+                    
+                    // Normalize distance to 0-1 range
+                    const normalizedDistance = Math.min(distance / 2000, 1);
+                    
+                    // Interpolate between colors
+                    if (normalizedDistance < 0.3) {
+                        // Inner stars - bluish
+                        color.setHSL(0.6, 0.8, 0.8 + Math.random() * 0.2);
+                    } else if (normalizedDistance < 0.6) {
+                        // Middle stars - purplish
+                        color.setHSL(0.75, 0.8, 0.8 + Math.random() * 0.2);
+                    } else {
+                        // Outer stars - reddish
+                        color.setHSL(0.95, 0.8, 0.8 + Math.random() * 0.2);
+                    }
+                    
+                    colors[i3] = color.r;
+                    colors[i3 + 1] = color.g;
+                    colors[i3 + 2] = color.b;
+                }
+                
+                starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                starsGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+                starsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                
+                const starsMaterial = new THREE.PointsMaterial({
+                    size: 2,
+                    transparent: true,
+                    opacity: 0.8,
+                    vertexColors: true,
+                    sizeAttenuation: true
+                });
+                
+                this.starfield = new THREE.Points(starsGeometry, starsMaterial);
+                this.scene.add(this.starfield);
+                
+                // Animate starfield
+                this.animateStarfield();
+            }
+            
+            // Animate starfield with subtle movement
+            animateStarfield() {
+                gsap.to(this.starfield.rotation, {
+                    y: Math.PI * 2,
+                    duration: 500,
+                    ease: 'none',
+                    repeat: -1
+                });
+            }
+            
+            // Initialize Stream View (default)
+            initStreamView() {
+                this.streamView = new THREE.Group();
+                this.scene.add(this.streamView);
+                
+                // Create more interesting flow paths (curved lines in 3D space)
+                const flowPathsCount = 10; // More paths for better 3D distribution
+                this.flowPaths = [];
+                
+                for (let i = 0; i < flowPathsCount; i++) {
+                    // Create a unique 3D path with more points for smoother curves
+                    const curvePoints = [];
+                    const curvePointCount = 16;
+                    
+                    // Generate unique curve pattern for each path
+                    for (let j = 0; j < curvePointCount; j++) {
+                        const t = j / (curvePointCount - 1);
+                        
+                        // Use different curve shapes for each path
+                        const angle = (i / flowPathsCount) * Math.PI * 2; // Spread paths in a circle
+                        const radius = 350; // Better fill the viewing area
+                        
+                        // Create interesting 3D curves - these are similar to the original but with better centering
+                        const x = Math.cos(angle) * radius * 0.8 * Math.sin(t * Math.PI);
+                        const y = Math.sin(angle) * radius * 0.4 * Math.sin(t * Math.PI * 1.5) + (Math.random() - 0.5) * 50;
+                        const z = radius * (t - 0.5); // Center at origin and extend in both directions
+                        
+                        curvePoints.push(new THREE.Vector3(x, y, z));
+                    }
+                    
+                    const pathGeometry = new THREE.BufferGeometry();
+                    const positions = new Float32Array(curvePoints.length * 3);
+                    
+                    for (let j = 0; j < curvePoints.length; j++) {
+                        positions[j * 3] = curvePoints[j].x;
+                        positions[j * 3 + 1] = curvePoints[j].y;
+                        positions[j * 3 + 2] = curvePoints[j].z;
+                    }
+                    
+                    pathGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                    
+                    // Use purple color palette
+                    const hue = 0.75 + (i / flowPathsCount) * 0.15; // Range from purple to violet
+                    const pathColor = new THREE.Color().setHSL(hue, 0.7, 0.35);
+                    
+                    const path = new THREE.Line(
+                        pathGeometry,
+                        new THREE.LineBasicMaterial({ 
+                            color: pathColor, 
+                            transparent: true, 
+                            opacity: 0.4,
+                            linewidth: 1
+                        })
+                    );
+                    
+                    this.flowPaths.push({
+                        line: path,
+                        points: pathGeometry.attributes.position.array,
+                        curve: new THREE.CatmullRomCurve3(
+                            Array(curvePoints.length).fill().map((_, j) => {
+                                return new THREE.Vector3(
+                                    positions[j * 3],
+                                    positions[j * 3 + 1],
+                                    positions[j * 3 + 2]
+                                );
+                            })
+                        )
+                    });
+                    
+                    this.streamView.add(path);
+                }
+            }
+            
+            // No other views - Stream view only
+            
+            // Initialize UI elements and event listeners
+            initUI() {
+                // Stream view is the only view now
+                
+                // Pause/resume button
+                const pauseBtn = document.getElementById('pause-btn');
+                pauseBtn.addEventListener('click', () => {
+                    this.state.isPaused = !this.state.isPaused;
+                    pauseBtn.textContent = this.state.isPaused ? 'Resume' : 'Pause';
+                });
+                
+                // Help button
+                const helpBtn = document.getElementById('help-btn');
+                helpBtn.addEventListener('click', () => {
+                    document.getElementById('control-help').classList.toggle('show');
+                });
+                
+                // Close transaction details
+                document.getElementById('detail-close').addEventListener('click', () => {
+                    document.getElementById('tx-details').classList.remove('show');
+                    this.state.selectedTransaction = null;
+                });
+                
+                // Hide notification by default
+                document.getElementById('notification').style.display = 'none';
+                
+                // Add keyboard shortcuts
+                window.addEventListener('keydown', (e) => {
+                    switch(e.key) {
+                        case ' ': // Space bar
+                            this.state.isPaused = !this.state.isPaused;
+                            pauseBtn.textContent = this.state.isPaused ? 'Resume' : 'Pause';
+                            break;
+                        case 'r': // Reset camera
+                            this.setupCamera();
+                            break;
+                        case 'a': // Toggle auto-rotation
+                            this.controls.autoRotate = !this.controls.autoRotate;
+                            break;
+                    }
+                });
+                
+                // Add double-click for transaction selection
+                window.addEventListener('dblclick', (event) => {
+                    const mouse = new THREE.Vector2(
+                        (event.clientX / window.innerWidth) * 2 - 1,
+                        -(event.clientY / window.innerHeight) * 2 + 1
+                    );
+                    
+                    this.selectTransactionByMouse(mouse);
+                });
+                
+                // Mouse move for tooltips
+                window.addEventListener('mousemove', (event) => {
+                    this.mouse = new THREE.Vector2(
+                        (event.clientX / window.innerWidth) * 2 - 1,
+                        -(event.clientY / window.innerHeight) * 2 + 1
+                    );
+                    
+                    // Position tooltip at cursor
+                    document.getElementById('tooltip').style.left = `${event.clientX + 10}px`;
+                    document.getElementById('tooltip').style.top = `${event.clientY + 10}px`;
+                });
+            }
+            
+            // Setup camera for stream view
+            setupCamera() {
+                // Position camera to better see the flow
+                gsap.to(this.camera.position, {
+                    x: 0, y: 50, z: 400,
+                    duration: 1.5,
+                    ease: 'power2.inOut'
+                });
+                
+                // Look at center
+                gsap.to(this.camera.rotation, {
+                    duration: 1.5,
+                    ease: 'power2.inOut',
+                    onUpdate: () => {
+                        this.camera.lookAt(new THREE.Vector3(0, 0, 0));
+                    }
+                });
+                
+                // Add subtle auto-rotation for more dynamic view
+                this.controls.autoRotate = true;
+                this.controls.autoRotateSpeed = 0.5;
+            }
+            
+            // Start data polling with exponential backoff
+            startDataPolling() {
+                // Use a worker to handle data polling in a separate thread
+                this.setupDataWorker();
+                
+                // TPS calculation removed as requested
+            }
+            
+            // Setup data worker for non-blocking data fetching
+            setupDataWorker() {
+                // Create worker using blob URL to avoid separate file
+                const workerScript = `
+                    let pollingInterval;
+                    let retryInterval = 5000;
+                    let failedAttempts = 0;
+                    let lastProcessedBlock = 0;
+                    let web3;
+                    
+                    // Handle messages from main thread
+                    self.onmessage = function(e) {
+                        const data = e.data;
+                        
+                        switch(data.action) {
+                            case 'init':
+                                // Initialize worker with config
+                                self.importScripts('https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js');
+                                web3 = new Web3(data.rpcEndpoint);
+                                lastProcessedBlock = data.lastProcessedBlock || 0;
+                                retryInterval = data.retryInterval || 5000;
+                                startPolling(data.pollingInterval);
+                                break;
+                                
+                            case 'pause':
+                                // Pause or resume polling
+                                if (data.isPaused) {
+                                    if (pollingInterval) clearInterval(pollingInterval);
+                                } else {
+                                    startPolling(data.pollingInterval);
+                                }
+                                break;
+                                
+                            case 'stop':
+                                // Stop polling
+                                if (pollingInterval) clearInterval(pollingInterval);
+                                break;
+                        }
+                    };
+                    
+                    // Start polling for new blocks
+                    function startPolling(interval) {
+                        if (pollingInterval) clearInterval(pollingInterval);
+                        
+                        // Initial fetch
+                        fetchLatestBlock();
+                        
+                        // Set interval for polling
+                        pollingInterval = setInterval(fetchLatestBlock, interval);
+                    }
+                    
+                    // Fetch latest block
+                    async function fetchLatestBlock() {
+                        try {
+                            // Get latest block number
+                            const blockNumber = await web3.eth.getBlockNumber();
+                            
+                            // Reset failed attempts
+                            failedAttempts = 0;
+                            
+                            // Send connection status update
+                            self.postMessage({
+                                type: 'connectionStatus',
+                                status: 'connected'
+                            });
+                            
+                            // Only process if this is a new block
+                            if (blockNumber > lastProcessedBlock) {
+                                // Send block number update
+                                self.postMessage({
+                                    type: 'newBlock',
+                                    blockNumber: blockNumber
+                                });
+                                
+                                // Fetch block with transactions
+                                fetchBlockWithTransactions(blockNumber);
+                                
+                                // Update last processed block
+                                lastProcessedBlock = blockNumber;
+                            }
+                        } catch (error) {
+                            failedAttempts++;
+                            
+                            self.postMessage({
+                                type: 'error',
+                                message: 'Error fetching latest block: ' + error.message,
+                                failedAttempts: failedAttempts
+                            });
+                            
+                            // Update connection status on repeated failures
+                            if (failedAttempts > 3) {
+                                self.postMessage({
+                                    type: 'connectionStatus',
+                                    status: 'disconnected'
+                                });
+                                
+                                // Clear current interval and set longer retry
+                                if (pollingInterval) clearInterval(pollingInterval);
+                                setTimeout(() => startPolling(interval), retryInterval);
+                                
+                                // Generate random transactions for demo if needed
+                                if (failedAttempts > 5) {
+                                    self.postMessage({
+                                        type: 'generateRandom'
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Fetch block with transactions
+                    async function fetchBlockWithTransactions(blockNumber) {
+                        try {
+                            // Get block with transactions
+                            const block = await web3.eth.getBlock(blockNumber, true);
+                            
+                            if (block && block.transactions) {
+                                // Send transactions to main thread
+                                self.postMessage({
+                                    type: 'transactions',
+                                    blockNumber: blockNumber,
+                                    transactions: block.transactions,
+                                    timestamp: block.timestamp
+                                });
+                            }
+                        } catch (error) {
+                            self.postMessage({
+                                type: 'error',
+                                message: 'Error fetching block ' + blockNumber + ': ' + error.message
+                            });
+                        }
+                    }
+                `;
+                
+                // Create blob URL
+                const blob = new Blob([workerScript], { type: 'application/javascript' });
+                this.blobURL = URL.createObjectURL(blob);
+                
+                // Create worker
+                this.dataWorker = new Worker(this.blobURL);
+                
+                // Set up message handler
+                this.dataWorker.onmessage = (e) => {
+                    const data = e.data;
+                    
+                    switch(data.type) {
+                        case 'connectionStatus':
+                            this.updateConnectionStatus(data.status);
+                            break;
+                            
+                        case 'newBlock':
+                            this.state.latestBlockNumber = data.blockNumber;
+                            document.getElementById('block-value').textContent = data.blockNumber.toLocaleString();
+                            break;
+                            
+                        case 'transactions':
+                            // Format and process transactions from worker
+                            if (data.transactions && data.transactions.length > 0) {
+                                console.log(`Processing ${data.transactions.length} transactions from block ${data.blockNumber}`);
+                                
+                                const formattedTransactions = data.transactions.map(tx => {
+                                    const block = { timestamp: data.timestamp, number: data.blockNumber };
+                                    return this.formatTransaction(tx, block);
+                                });
+                                
+                                // Process in main thread without blocking animation
+                                requestAnimationFrame(() => {
+                                    this.processTransactions(formattedTransactions);
+                                });
+                            }
+                            break;
+                            
+                        case 'error':
+                            console.error(data.message);
+                            this.state.failedAttempts = data.failedAttempts || this.state.failedAttempts;
+                            break;
+                            
+                        case 'generateRandom':
+                            // Generate random transactions for demo purposes
+                            requestAnimationFrame(() => {
+                                this.generateRandomTransactions();
+                            });
+                            break;
+                    }
+                };
+                
+                // Initialize worker
+                this.dataWorker.postMessage({
+                    action: 'init',
+                    rpcEndpoint: this.config.rpcEndpoint,
+                    pollingInterval: this.config.pollingInterval,
+                    retryInterval: this.config.retryInterval,
+                    lastProcessedBlock: this.state.lastProcessedBlock
+                });
+                
+                // Handle pause state changes
+                // Watch for pause state changes
+                Object.defineProperty(this.state, 'isPaused', {
+                    get: function() {
+                        return this._isPaused;
+                    },
+                    set: function(value) {
+                        this._isPaused = value;
+                        if (this.app && this.app.dataWorker) {
+                            this.app.dataWorker.postMessage({
+                                action: 'pause',
+                                isPaused: value,
+                                pollingInterval: this.app.config.pollingInterval
+                            });
+                        }
+                    }
+                });
+                
+                // Store app reference for the state object
+                this.state.app = this;
+                this.state._isPaused = false;
+            }
+            
+            // This will be called from the worker with the formatted data
+            processTransactionsNonBlocking(transactions) {
+                // Process transactions asynchronously
+                setTimeout(() => {
+                    this.processTransactions(transactions);
+                }, 0);
+            }
+            
+            // Format transaction from Web3 format to our internal format
+            formatTransaction(tx, block) {
+                // Check if it's a contract creation
+                const isContractCreation = !tx.to;
+                
+                // Check if it's a likely contract interaction
+                const isContractInteraction = tx.input && tx.input.length > 10;
+                
+                // Get method ID
+                const methodId = tx.input && tx.input.length >= 10 ? tx.input.slice(0, 10) : '0x';
+                
+                return {
+                    hash: tx.hash,
+                    blockHash: tx.blockHash,
+                    blockNumber: tx.blockNumber,
+                    timestamp: block.timestamp * 1000, // Convert to milliseconds
+                    from: tx.from,
+                    to: tx.to || '',
+                    value: this.web3.utils.fromWei(tx.value, 'ether'),
+                    gas: tx.gas,
+                    gasPrice: tx.gasPrice,
+                    nonce: tx.nonce,
+                    transactionIndex: tx.transactionIndex,
+                    input: tx.input,
+                    contractAddress: isContractCreation ? 'pending' : '',
+                    status: 1, // Assume success
+                    methodID: methodId,
+                    fromAddress: {
+                        address: tx.from,
+                        type: 'EOA',
+                        isContract: false
+                    },
+                    toAddress: {
+                        address: tx.to || '',
+                        isContract: isContractInteraction
+                    }
+                };
+            }
+            
+            // Generate random transactions for demo/testing
+            generateRandomTransactions() {
+                // Generate only if we're in disconnected state
+                if (this.state.connectionStatus !== 'disconnected') return;
+                
+                const count = Math.floor(Math.random() * 5) + 1;
+                const randomTransactions = [];
+                
+                for (let i = 0; i < count; i++) {
+                    const blockNumber = this.state.latestBlockNumber + (Math.random() > 0.8 ? 1 : 0);
+                    
+                    randomTransactions.push({
+                        hash: '0x' + Math.random().toString(16).substr(2, 64),
+                        blockHash: '0x' + Math.random().toString(16).substr(2, 64),
+                        blockNumber: blockNumber,
+                        timestamp: Date.now(),
+                        from: '0x' + Math.random().toString(16).substr(2, 40),
+                        to: '0x' + Math.random().toString(16).substr(2, 40),
+                        value: Math.random() > 0.8 ? (Math.random() * 10).toFixed(2) : '0',
+                        gas: Math.floor(Math.random() * 500000),
+                        gasPrice: Math.floor(Math.random() * 100) * 1e9,
+                        nonce: Math.floor(Math.random() * 1000),
+                        transactionIndex: 0,
+                        input: Math.random() > 0.7 ? '0xa9059cbb' + '0'.repeat(56) : '0x',
+                        contractAddress: '',
+                        status: 1,
+                        methodID: Math.random() > 0.7 ? '0xa9059cbb' : '0x',
+                        fromAddress: {
+                            type: 'EOA',
+                            isContract: false
+                        },
+                        toAddress: {
+                            isContract: Math.random() > 0.7
+                        }
+                    });
+                }
+                
+                // If generating a new block, increment block number
+                if (randomTransactions.length > 0 && randomTransactions[0].blockNumber > this.state.latestBlockNumber) {
+                    this.state.latestBlockNumber = randomTransactions[0].blockNumber;
+                    document.getElementById('block-value').textContent = this.state.latestBlockNumber.toLocaleString();
+                }
+                
+                // Process random transactions
+                this.processTransactions(randomTransactions);
+            }
+            
+            // Process incoming transactions
+            processTransactions(transactions) {
+                // Skip if no transactions
+                if (transactions.length === 0) return;
+                
+                // Filter out transactions we already have
+                const newTransactions = transactions.filter(tx => !this.state.knownTransactionHashes.has(tx.hash));
+                if (newTransactions.length === 0) return;
+                
+                // Update transaction count
+                this.state.transactionCount += newTransactions.length;
+                document.getElementById('txn-value').textContent = this.state.transactionCount.toLocaleString();
+                
+                // Record transactions for TPS calculation
+                this.recentTransactions = (this.recentTransactions || []).concat(newTransactions);
+                
+                // Add new transactions to state
+                this.state.transactions = [
+                    ...newTransactions,
+                    ...this.state.transactions
+                ].slice(0, this.config.maxVisibleTransactions);
+                
+                // Add to known hashes
+                newTransactions.forEach(tx => {
+                    this.state.knownTransactionHashes.add(tx.hash);
+                });
+                
+                // Schedule particle creation in chunks to avoid frame rate drops
+                this.processTransactionsChunked(newTransactions, 0);
+            }
+            
+            // Process transactions in small chunks to prevent UI freezing
+            processTransactionsChunked(transactions, index, chunkSize = 5) {
+                if (index >= transactions.length) {
+                    // All transactions processed, now handle plugin events
+                    this.triggerPluginEvents(transactions);
+                    return;
+                }
+                
+                // Process a small chunk of transactions
+                const endIndex = Math.min(index + chunkSize, transactions.length);
+                const chunk = transactions.slice(index, endIndex);
+                
+                // Create particles for this chunk
+                chunk.forEach(tx => this.createParticle(tx));
+                
+                // Schedule next chunk using requestAnimationFrame to yield to frame rendering
+                requestAnimationFrame(() => {
+                    this.processTransactionsChunked(transactions, endIndex, chunkSize);
+                });
+            }
+            
+            // Create particle for transaction
+            createParticle(transaction) {
+                // Determine transaction type and color
+                let color;
+                if (transaction.toAddress && transaction.toAddress.isContract) {
+                    // Contract interaction
+                    color = this.config.colors.contract;
+                } else if (transaction.methodID === '0xa9059cbb') {
+                    // ERC20 token transfer
+                    color = this.config.colors.token;
+                } else if (transaction.methodID && transaction.methodID.startsWith('0x')) {
+                    // NFT or other contract method
+                    color = this.config.colors.nft;
+                } else {
+                    // Standard transaction
+                    color = this.config.colors.standard;
+                }
+                
+                // Determine size based on value or gas
+                const value = parseFloat(transaction.value) || 0;
+                const baseSize = 5;
+                const valueSize = Math.min(Math.log(value + 1) * 0.5, 10);
+                const size = baseSize + valueSize;
+                
+                // Create particle geometry and material (purple wireframe cubes)
+                const geometry = new THREE.BoxGeometry(size, size, size);
+                const material = new THREE.MeshBasicMaterial({
+                    color: color,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                // Add animated line edges for better visibility
+                const edgesGeometry = new THREE.EdgesGeometry(geometry);
+                const edgesMaterial = new THREE.LineBasicMaterial({ 
+                    color: color,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+                
+                // Create particle mesh
+                const particle = new THREE.Mesh(geometry, material);
+                
+                // Add edges to particle
+                particle.add(edges);
+                
+                // Create and add transaction label
+                const label = this.createTransactionLabel(transaction, particle.position);
+                particle.add(label);
+                
+                // Get random flow path
+                const pathIndex = Math.floor(Math.random() * this.flowPaths.length);
+                const path = this.flowPaths[pathIndex];
+                
+                // Position at start of path
+                const pathPosition = path.curve.getPoint(0);
+                particle.position.copy(pathPosition);
+                
+                // Store path data with particle for animation
+                particle.userData = {
+                    transaction: transaction,
+                    path: path,
+                    progress: 0,
+                    speed: 0.2 + Math.random() * 0.8,
+                    createdAt: Date.now(),
+                    color: color
+                };
+                
+                // Add to scene
+                this.particleSystem.add(particle);
+                
+                // Store particle
+                this.state.particles.push(particle);
+                
+                // Create particle effect
+                this.createParticleEffect(particle.position, color);
+            }
+            
+            // Create text label for a transaction
+            createTransactionLabel(transaction, position) {
+                // Create canvas for text
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 256;
+                canvas.height = 64;
+                
+                // Create background with border
+                context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Add purple border
+                context.strokeStyle = '#8a2be2';
+                context.lineWidth = 3;
+                context.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+                
+                // Add text
+                context.font = 'bold 16px Arial';
+                context.fillStyle = 'white';
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                
+                // Shorten and display transaction hash
+                const shortHash = this.shortenAddress(transaction.hash);
+                context.fillText(shortHash, canvas.width / 2, canvas.height / 2);
+                
+                // Create texture from canvas
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.needsUpdate = true;
+                
+                // Create sprite material
+                const material = new THREE.SpriteMaterial({
+                    map: texture,
+                    transparent: true
+                });
+                
+                // Create sprite
+                const sprite = new THREE.Sprite(material);
+                sprite.scale.set(32, 8, 1);
+                
+                // Position above the transaction cube
+                sprite.position.set(0, 15, 0);
+                
+                return sprite;
+            }
+            
+            // Blocks view removed - Stream view only
+            
+            // Create particle effect at position
+            createParticleEffect(position, color) {
+                const particleCount = 20;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    positions[i * 3] = position.x;
+                    positions[i * 3 + 1] = position.y;
+                    positions[i * 3 + 2] = position.z;
+                }
+                
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                // Create shader material for more attractive particles
+                const material = new THREE.PointsMaterial({
+                    color: color,
+                    size: 5,
+                    transparent: true,
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const particles = new THREE.Points(geometry, material);
+                this.scene.add(particles);
+                
+                // Animate particles outward with acceleration
+                gsap.to(positions, {
+                    duration: 1.5,
+                    ease: 'power2.out',
+                    onUpdate: () => {
+                        for (let i = 0; i < particleCount; i++) {
+                            const i3 = i * 3;
+                            const speed = Math.random() * 2 + 1;
+                            
+                            // Create direction vector from center
+                            const dirX = positions[i3] - position.x;
+                            const dirY = positions[i3 + 1] - position.y;
+                            const dirZ = positions[i3 + 2] - position.z;
+                            
+                            // Normalize
+                            const length = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ) || 1;
+                            
+                            // Add to position (accelerating outward)
+                            positions[i3] += (dirX / length) * speed + (Math.random() - 0.5);
+                            positions[i3 + 1] += (dirY / length) * speed + (Math.random() - 0.5);
+                            positions[i3 + 2] += (dirZ / length) * speed + (Math.random() - 0.5);
+                        }
+                        geometry.attributes.position.needsUpdate = true;
+                    },
+                    onComplete: () => {
+                        // Remove particles after animation
+                        this.scene.remove(particles);
+                        geometry.dispose();
+                        material.dispose();
+                    }
+                });
+                
+                // Fade out with color change
+                gsap.to(material, {
+                    opacity: 0,
+                    duration: 1.5,
+                    ease: 'power2.out',
+                    onUpdate: () => {
+                        // Shift color slightly
+                        const hsl = {};
+                        material.color.getHSL(hsl);
+                        material.color.setHSL((hsl.h + 0.005) % 1, hsl.s, hsl.l);
+                    }
+                });
+            }
+            
+            // Select transaction by mouse position
+            selectTransactionByMouse(mouse) {
+                // Create raycaster if not exists
+                if (!this.raycaster) {
+                    this.raycaster = new THREE.Raycaster();
+                }
+                
+                // Update raycaster with mouse position
+                this.raycaster.setFromCamera(mouse, this.camera);
+                
+                // Find intersections with particles
+                const intersects = this.raycaster.intersectObjects(this.state.particles, true);
+                
+                if (intersects.length > 0) {
+                    let object = intersects[0].object;
+                    
+                    // Traverse up to find parent with transaction data
+                    while (object && !object.userData.transaction && object.parent) {
+                        object = object.parent;
+                    }
+                    
+                    if (object && object.userData.transaction) {
+                        // Select this transaction
+                        this.showTransactionDetails(object.userData.transaction);
+                        
+                        // Create click effect
+                        const position = object.position.clone();
+                        const clickEffect = new THREE.Mesh(
+                            new THREE.RingGeometry(5, 20, 32),
+                            new THREE.MeshBasicMaterial({
+                                color: 0xffffff,
+                                transparent: true,
+                                opacity: 0.8,
+                                side: THREE.DoubleSide
+                            })
+                        );
+                        clickEffect.position.copy(position);
+                        clickEffect.lookAt(this.camera.position);
+                        this.scene.add(clickEffect);
+                        
+                        // Animate click effect
+                        gsap.to(clickEffect.scale, {
+                            x: 3, y: 3, z: 3,
+                            duration: 0.8,
+                            ease: 'power2.out'
+                        });
+                        
+                        gsap.to(clickEffect.material, {
+                            opacity: 0,
+                            duration: 0.8,
+                            ease: 'power2.out',
+                            onComplete: () => {
+                                this.scene.remove(clickEffect);
+                                clickEffect.geometry.dispose();
+                                clickEffect.material.dispose();
+                            }
+                        });
+                    }
+                }
+            }
+            
+            // Show transaction details
+            showTransactionDetails(transaction) {
+                // Update UI with transaction details
+                document.getElementById('detail-block').textContent = transaction.blockNumber;
+                document.getElementById('detail-time').textContent = new Date(transaction.timestamp).toLocaleString();
+                document.getElementById('detail-from').textContent = this.shortenAddress(transaction.from);
+                document.getElementById('detail-to').textContent = this.shortenAddress(transaction.to);
+                document.getElementById('detail-value').textContent = `${transaction.value} MON`;
+                document.getElementById('detail-gas').textContent = transaction.gas.toLocaleString();
+                document.getElementById('detail-hash').textContent = transaction.hash;
+                
+                // Show details panel
+                document.getElementById('tx-details').classList.add('show');
+                
+                // Store selected transaction
+                this.state.selectedTransaction = transaction;
+                
+                // Highlight selected particle
+                this.highlightSelectedParticle();
+            }
+            
+            // Highlight the particle of the selected transaction
+            highlightSelectedParticle() {
+                if (!this.state.selectedTransaction) return;
+                
+                // Reset all particles
+                this.state.particles.forEach(particle => {
+                    if (particle.userData.transaction) {
+                        particle.material.opacity = 0.9;
+                        
+                        // Reset scale
+                        gsap.to(particle.scale, {
+                            x: 1, y: 1, z: 1,
+                            duration: 0.3
+                        });
+                    }
+                });
+                
+                // Find and highlight selected particle
+                const selectedHash = this.state.selectedTransaction.hash;
+                const selectedParticle = this.state.particles.find(p => 
+                    p.userData.transaction && p.userData.transaction.hash === selectedHash
+                );
+                
+                if (selectedParticle) {
+                    // Make fully opaque and change color for highlight
+                    selectedParticle.material.color.set(0xff00ff); // Bright magenta for highlight
+                    selectedParticle.material.opacity = 1;
+                    
+                    // Scale up slightly
+                    gsap.to(selectedParticle.scale, {
+                        x: 1.5, y: 1.5, z: 1.5,
+                        duration: 0.3,
+                        ease: 'back.out(1.7)'
+                    });
+                    
+                    // Move camera to look at the particle
+                    const target = selectedParticle.position.clone();
+                    const distanceVector = new THREE.Vector3(
+                        target.x + 100,
+                        target.y + 50,
+                        target.z + 150
+                    );
+                    
+                    // Smooth camera animation
+                    gsap.to(this.camera.position, {
+                        x: distanceVector.x,
+                        y: distanceVector.y,
+                        z: distanceVector.z,
+                        duration: 1.5,
+                        ease: 'power2.inOut',
+                        onUpdate: () => {
+                            this.camera.lookAt(target);
+                        }
+                    });
+                }
+            }
+            
+            // TPS calculation removed as requested
+            
+            // Animate scene
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                // Update controls
+                if (this.controls) {
+                    this.controls.update();
+                }
+                
+                // Rotate starfield very slightly for ambient motion
+                if (this.starfield) {
+                    this.starfield.rotation.y += 0.0001;
+                }
+                
+                // Update particles based on view
+                this.updateParticles();
+                
+                // Handle raycasting for interactivity
+                this.handleRaycasting();
+                
+                // Render scene
+                if (this.composer) {
+                    this.composer.render();
+                } else {
+                    this.renderer.render(this.scene, this.camera);
+                }
+            }
+            
+            // Update particles based on current view
+            updateParticles() {
+                const now = Date.now();
+                const particlesToRemove = [];
+                
+                // Update each particle
+                this.state.particles.forEach(particle => {
+                    // Check if particle should be removed (based on lifetime)
+                    if (now - particle.userData.createdAt > this.config.particleLifetime) {
+                        particlesToRemove.push(particle);
+                        return;
+                    }
+                    
+                    // Move along path
+                    particle.userData.progress += particle.userData.speed * 0.005;
+                    
+                    if (particle.userData.progress > 1) {
+                        particlesToRemove.push(particle);
+                    } else {
+                        const newPosition = particle.userData.path.curve.getPoint(particle.userData.progress);
+                        particle.position.copy(newPosition);
+                        
+                        // Add slight randomness to movement for more natural flow
+                        particle.position.x += (Math.random() - 0.5) * 0.8;
+                        particle.position.y += (Math.random() - 0.5) * 0.8;
+                        particle.position.z += (Math.random() - 0.5) * 0.8;
+                        
+                        // Add rotation for more dynamic movement
+                        particle.rotation.x += 0.01;
+                        particle.rotation.y += 0.01;
+                        particle.rotation.z += 0.005;
+                        
+                        // Make sure label always faces camera
+                        if (particle.children.length > 1) {
+                            const label = particle.children[1];
+                            if (label instanceof THREE.Sprite) {
+                                // Update label position to stay above the particle
+                                label.position.set(0, 15, 0);
+                            }
+                        }
+                    }
+                    
+                    // Pulse effect for wireframe
+                    const age = (now - particle.userData.createdAt) / 1000;
+                    const pulse = Math.sin(age * 3) * 0.2 + 0.8;
+                    particle.material.opacity = pulse * 0.9;
+                });
+                
+                // Remove old particles
+                particlesToRemove.forEach(particle => {
+                    this.particleSystem.remove(particle);
+                    
+                    // Remove from state
+                    const index = this.state.particles.indexOf(particle);
+                    if (index !== -1) {
+                        this.state.particles.splice(index, 1);
+                    }
+                    
+                    // Dispose geometries and materials
+                    if (particle.geometry) particle.geometry.dispose();
+                    if (particle.material) particle.material.dispose();
+                });
+            }
+            
+            // Handle raycasting for interactivity
+            handleRaycasting() {
+                if (!this.raycaster) {
+                    this.raycaster = new THREE.Raycaster();
+                }
+                
+                if (!this.mouse) {
+                    return;
+                }
+                
+                // Update raycaster with current mouse position
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                
+                // Find intersections with particles
+                const intersects = this.raycaster.intersectObjects(this.state.particles, true);
+                
+                // Reset cursor and hide tooltip
+                document.body.style.cursor = 'default';
+                document.getElementById('tooltip').style.opacity = '0';
+                
+                // Reset all particle edge colors
+                this.state.particles.forEach(particle => {
+                    const edges = particle.children.find(child => child instanceof THREE.LineSegments);
+                    if (edges && particle !== this.state.selectedParticle) {
+                        // Get original color based on transaction type
+                        let color;
+                        if (particle.userData.transaction) {
+                            const tx = particle.userData.transaction;
+                            if (tx.toAddress && tx.toAddress.isContract) {
+                                color = this.config.colors.contract;
+                            } else if (tx.methodID === '0xa9059cbb') {
+                                color = this.config.colors.token;
+                            } else if (tx.methodID && tx.methodID.startsWith('0x')) {
+                                color = this.config.colors.nft;
+                            } else {
+                                color = this.config.colors.standard;
+                            }
+                        } else {
+                            color = this.config.colors.standard;
+                        }
+                        
+                        edges.material.color.setHex(color);
+                        edges.material.opacity = 0.7;
+                    }
+                });
+                
+                // If hovering over a particle
+                if (intersects.length > 0) {
+                    let object = intersects[0].object;
+                    
+                    // Traverse up to find parent with transaction data
+                    while (object && !object.userData.transaction && object.parent) {
+                        object = object.parent;
+                    }
+                    
+                    if (object && object.userData.transaction) {
+                        // Change cursor to pointer
+                        document.body.style.cursor = 'pointer';
+                        
+                        // Show tooltip
+                        const tooltip = document.getElementById('tooltip');
+                        tooltip.textContent = this.shortenAddress(object.userData.transaction.hash);
+                        tooltip.style.opacity = '1';
+                        
+                        // Highlight edges
+                        const edges = object.children.find(child => child instanceof THREE.LineSegments);
+                        if (edges) {
+                            edges.material.color.set(0xff00ff);
+                            edges.material.opacity = 1;
+                        }
+                    }
+                }
+            }
+            
+            // Helper: Shorten address for display
+            shortenAddress(address) {
+                if (!address) return '-';
+                return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+            }
+            
+            // Plugin system methods
+            loadPlugins() {
+                // Register built-in plugins
+                this.registerPlugin(new ContractDeploymentPlugin());
+                this.registerPlugin(new LargeTransactionPlugin());
+                this.registerPlugin(new NFTMintPlugin());
+            }
+            
+            registerPlugin(plugin) {
+                plugin.init(this);
+                this.plugins.push(plugin);
+                console.log(`Plugin registered: ${plugin.name}`);
+            }
+            
+            triggerPluginEvents(transactions) {
+                // Queue plugin processing to avoid UI freezing
+                this.queuePluginProcessing(this.plugins, transactions.slice());
+            }
+            
+            // Queue plugin processing across frames
+            queuePluginProcessing(plugins, transactions, pluginIndex = 0, txIndex = 0) {
+                if (pluginIndex >= plugins.length) return;
+                
+                const plugin = plugins[pluginIndex];
+                const txChunkSize = 10; // Process up to 10 transactions per frame
+                
+                // Process a chunk of transactions for current plugin
+                for (let i = 0; i < txChunkSize && txIndex < transactions.length; i++, txIndex++) {
+                    plugin.processTransaction(transactions[txIndex]);
+                }
+                
+                if (txIndex >= transactions.length) {
+                    // Move to next plugin
+                    requestAnimationFrame(() => {
+                        this.queuePluginProcessing(plugins, transactions, pluginIndex + 1, 0);
+                    });
+                } else {
+                    // Continue with current plugin, next chunk
+                    requestAnimationFrame(() => {
+                        this.queuePluginProcessing(plugins, transactions, pluginIndex, txIndex);
+                    });
+                }
+            }
+            
+            triggerPluginEvent(eventName, data) {
+                this.plugins.forEach(plugin => {
+                    if (typeof plugin[eventName] === 'function') {
+                        plugin[eventName](data);
+                    }
+                });
+            }
+            
+            // Show notification
+            showNotification(title, message) {
+                const notification = document.getElementById('notification');
+                
+                // Update notification content
+                document.querySelector('.notification-title').textContent = title;
+                document.querySelector('.notification-message').textContent = message;
+                
+                // Show notification
+                notification.style.display = 'block';
+                notification.classList.add('show');
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.style.display = 'none';
+                    }, 300);
+                }, 5000);
+            }
+        }
+        
+        // Contract Deployment Plugin
+        class ContractDeploymentPlugin {
+            constructor() {
+                this.name = 'Contract Deployment Plugin';
+                this.app = null;
+            }
+            
+            init(app) {
+                this.app = app;
+            }
+            
+            processTransaction(transaction) {
+                // Check if this is a contract deployment (empty 'to' address)
+                if (!transaction.to) {
+                    console.log('Contract deployment detected in transaction:', transaction.hash);
+                    
+                    // Show notification
+                    this.app.showNotification(
+                        'Contract Deployment Detected!',
+                        `New contract deployment in transaction ${this.app.shortenAddress(transaction.hash)}`
+                    );
+                    
+                    // Create special visual effect for contract deployment
+                    this.createContractDeploymentEffect(transaction);
+                }
+            }
+            
+            createContractDeploymentEffect(transaction) {
+                // Find the particle for this transaction
+                const particle = this.app.state.particles.find(p => 
+                    p.userData.transaction && p.userData.transaction.hash === transaction.hash
+                );
+                
+                if (particle) {
+                    // Create special effect at particle position
+                    const position = particle.position.clone();
+                    
+                    // Create explosion effect
+                    this.createExplosionEffect(position);
+                    
+                    // Create contract representation
+                    this.createContractRepresentation(position, transaction);
+                }
+            }
+            
+            createExplosionEffect(position) {
+                const particleCount = 50;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    positions[i * 3] = position.x;
+                    positions[i * 3 + 1] = position.y;
+                    positions[i * 3 + 2] = position.z;
+                }
+                
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                const material = new THREE.PointsMaterial({
+                    color: 0x4dff77,
+                    size: 5,
+                    transparent: true,
+                    opacity: 1,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const particles = new THREE.Points(geometry, material);
+                this.app.scene.add(particles);
+                
+                // Animate particles outward
+                gsap.to(positions, {
+                    duration: 1.5,
+                    ease: 'power2.out',
+                    onUpdate: () => {
+                        for (let i = 0; i < particleCount; i++) {
+                            const i3 = i * 3;
+                            const angle = Math.random() * Math.PI * 2;
+                            const radius = Math.random() * 2 + 1;
+                            
+                            positions[i3] += Math.cos(angle) * radius;
+                            positions[i3 + 1] += Math.sin(angle) * radius;
+                            positions[i3 + 2] += (Math.random() - 0.5) * radius;
+                        }
+                        geometry.attributes.position.needsUpdate = true;
+                    },
+                    onComplete: () => {
+                        // Remove particles after animation
+                        this.app.scene.remove(particles);
+                        geometry.dispose();
+                        material.dispose();
+                    }
+                });
+                
+                // Fade out
+                gsap.to(material, {
+                    opacity: 0,
+                    duration: 1.5,
+                    ease: 'power2.out'
+                });
+            }
+            
+            createContractRepresentation(position, transaction) {
+                // Create a cube to represent the contract
+                const geometry = new THREE.BoxGeometry(20, 20, 20);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0x4dff77,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                const contractMesh = new THREE.Mesh(geometry, material);
+                contractMesh.position.copy(position);
+                
+                // Start small and grow
+                contractMesh.scale.set(0.1, 0.1, 0.1);
+                
+                // Add to scene
+                this.app.scene.add(contractMesh);
+                
+                // Animate appearance
+                gsap.to(contractMesh.scale, {
+                    x: 1, y: 1, z: 1,
+                    duration: 1,
+                    ease: 'elastic.out(1, 0.5)'
+                });
+                
+                // Spin effect
+                gsap.to(contractMesh.rotation, {
+                    x: Math.PI * 2,
+                    y: Math.PI * 2,
+                    duration: 2,
+                    ease: 'power2.out'
+                });
+                
+                // Fade out after a while
+                setTimeout(() => {
+                    gsap.to(contractMesh.material, {
+                        opacity: 0,
+                        duration: 1,
+                        ease: 'power2.out',
+                        onComplete: () => {
+                            this.app.scene.remove(contractMesh);
+                            geometry.dispose();
+                            material.dispose();
+                        }
+                    });
+                }, 5000);
+            }
+        }
+        
+        // Large Transaction Plugin
+        class LargeTransactionPlugin {
+            constructor() {
+                this.name = 'Large Transaction Plugin';
+                this.app = null;
+                this.threshold = 100; // MON
+            }
+            
+            init(app) {
+                this.app = app;
+            }
+            
+            processTransaction(transaction) {
+                // Check if this is a large value transaction
+                const value = parseFloat(transaction.value) || 0;
+                
+if (value >= this.threshold) {
+                    console.log('Large transaction detected:', value, 'ETH');
+                    
+                    // Show notification
+                    this.app.showNotification(
+                        'Large Transaction Detected!',
+                        `${value} ETH transferred from ${this.app.shortenAddress(transaction.from)} to ${this.app.shortenAddress(transaction.to)}`
+                    );
+                    
+                    // Create special visual effect for large transaction
+                    this.createLargeTransactionEffect(transaction);
+                }
+            }
+            
+            createLargeTransactionEffect(transaction) {
+                // Find the particle for this transaction
+                const particle = this.app.state.particles.find(p => 
+                    p.userData.transaction && p.userData.transaction.hash === transaction.hash
+                );
+                
+                if (particle) {
+                    // Enhance the particle
+                    particle.scale.set(2, 2, 2);
+                    
+                    // Change color to gold
+                    particle.material.color.setHex(0xffd700);
+                    const edges = particle.children.find(child => child instanceof THREE.LineSegments);
+                    if (edges) {
+                        edges.material.color.setHex(0xffd700);
+                    }
+                    
+                    // Add trail effect
+                    this.addTrailEffect(particle);
+                }
+            }
+            
+            addTrailEffect(particle) {
+                const trailPoints = [];
+                const trailLength = 20;
+                
+                // Initialize trail points
+                for (let i = 0; i < trailLength; i++) {
+                    trailPoints.push(particle.position.clone());
+                }
+                
+                // Create trail mesh
+                const trailGeometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(trailLength * 3);
+                
+                for (let i = 0; i < trailLength; i++) {
+                    positions[i * 3] = trailPoints[i].x;
+                    positions[i * 3 + 1] = trailPoints[i].y;
+                    positions[i * 3 + 2] = trailPoints[i].z;
+                }
+                
+                trailGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                const trailMaterial = new THREE.LineBasicMaterial({
+                    color: 0xffd700,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                
+                const trail = new THREE.Line(trailGeometry, trailMaterial);
+                this.app.scene.add(trail);
+                
+                // Update trail in animation loop
+                const updateTrail = () => {
+                    if (!this.app.scene.children.includes(particle)) {
+                        // Particle was removed, clean up trail
+                        this.app.scene.remove(trail);
+                        trailGeometry.dispose();
+                        trailMaterial.dispose();
+                        return;
+                    }
+                    
+                    // Shift trail points
+                    trailPoints.pop();
+                    trailPoints.unshift(particle.position.clone());
+                    
+                    // Update geometry
+                    for (let i = 0; i < trailLength; i++) {
+                        positions[i * 3] = trailPoints[i].x;
+                        positions[i * 3 + 1] = trailPoints[i].y;
+                        positions[i * 3 + 2] = trailPoints[i].z;
+                    }
+                    
+                    trailGeometry.attributes.position.needsUpdate = true;
+                    
+                    // Continue animation
+                    requestAnimationFrame(updateTrail);
+                };
+                
+                // Start animation
+                updateTrail();
+                
+                // Fade out trail after 10 seconds
+                setTimeout(() => {
+                    gsap.to(trailMaterial, {
+                        opacity: 0,
+                        duration: 2,
+                        ease: 'power2.out',
+                        onComplete: () => {
+                            // Clean up resources
+                            this.app.scene.remove(trail);
+                            trailGeometry.dispose();
+                            trailMaterial.dispose();
+                        }
+                    });
+                }, 10000);
+            }
+        }
+        
+        // NFT Mint Plugin
+        class NFTMintPlugin {
+            constructor() {
+                this.name = 'NFT Mint Plugin';
+                this.app = null;
+                this.nftMintMethods = ['0x6a627842', '0x40c10f19']; // Example method IDs for NFT minting
+                this.nftTransferMethods = ['0x23b872dd', '0x42842e0e']; // ERC-721 & ERC-1155 transfer methods
+            }
+            
+            init(app) {
+                this.app = app;
+            }
+            
+            processTransaction(transaction) {
+                // Check if transaction is an NFT mint or transfer
+                const isMint = this.nftMintMethods.includes(transaction.methodID);
+                const isTransfer = this.nftTransferMethods.includes(transaction.methodID);
+                
+                if (isMint || isTransfer) {
+                    console.log('NFT transaction detected:', transaction.hash);
+                    
+                    // Show notification for mints
+                    if (isMint) {
+                        this.app.showNotification(
+                            'NFT Mint Detected!',
+                            `New NFT minted in transaction ${this.app.shortenAddress(transaction.hash)}`
+                        );
+                    }
+                    
+                    // Create special visual effect for NFT mint/transfer
+                    this.createNFTEffect(transaction);
+                }
+            }
+            
+            createNFTEffect(transaction) {
+                // Find the particle for this transaction
+                const particle = this.app.state.particles.find(p => 
+                    p.userData.transaction && p.userData.transaction.hash === transaction.hash
+                );
+                
+                if (particle) {
+                    // Create frame effect at particle position
+                    const position = particle.position.clone();
+                    
+                    // Create NFT frame
+                    this.createNFTFrame(position);
+                }
+            }
+            
+            createNFTFrame(position) {
+                // Create a frame for the NFT
+                const frameSize = 30;
+                const frameThickness = 2;
+                
+                // Create outer frame
+                const outerGeometry = new THREE.BoxGeometry(
+                    frameSize, frameSize, frameThickness
+                );
+                const innerGeometry = new THREE.BoxGeometry(
+                    frameSize - frameThickness * 2, 
+                    frameSize - frameThickness * 2, 
+                    frameThickness + 0.1
+                );
+                
+                // Materials
+                const frameMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xf9cb28,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                // Create meshes
+                const outerFrame = new THREE.Mesh(outerGeometry, frameMaterial);
+                outerFrame.position.copy(position);
+                
+                // Add to scene
+                this.app.scene.add(outerFrame);
+                
+                // Animate appearance
+                outerFrame.scale.set(0.1, 0.1, 0.1);
+                outerFrame.rotation.x = Math.PI / 4;
+                outerFrame.rotation.y = Math.PI / 4;
+                
+                gsap.to(outerFrame.scale, {
+                    x: 1, y: 1, z: 1,
+                    duration: 0.8,
+                    ease: 'back.out(1.7)'
+                });
+                
+                // Spin effect
+                gsap.to(outerFrame.rotation, {
+                    x: Math.PI * 2,
+                    y: Math.PI * 2,
+                    duration: 5,
+                    ease: 'none',
+                    repeat: -1
+                });
+                
+                // Remove after a while
+                setTimeout(() => {
+                    gsap.to(outerFrame.scale, {
+                        x: 0.1, y: 0.1, z: 0.1,
+                        duration: 0.5,
+                        ease: 'power2.in',
+                        onComplete: () => {
+                            this.app.scene.remove(outerFrame);
+                            outerGeometry.dispose();
+                            innerGeometry.dispose();
+                            frameMaterial.dispose();
+                        }
+                    });
+                }, 10000);
+            }
+        }
+        
+        // Initialize application when page loads
+        let app;
+        window.addEventListener('load', () => {
+            app = new MonadExplorer();
+        });
+        
+        // Clean up resources when page unloads
+        window.addEventListener('beforeunload', () => {
+            if (app && app.dataWorker) {
+                app.dataWorker.postMessage({ action: 'stop' });
+                app.dataWorker.terminate();
+            }
+            
+            // Release any other resources
+            if (app) {
+                clearInterval(app.pollingInterval);
+                
+                // Release GPU resources
+                if (app.renderer) {
+                    app.renderer.dispose();
+                }
+                
+                // Release blob URL if created
+                if (app.blobURL) {
+                    URL.revokeObjectURL(app.blobURL);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
